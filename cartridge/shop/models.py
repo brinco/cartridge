@@ -9,6 +9,8 @@ from django.db.models.base import ModelBase
 from django.db.utils import DatabaseError
 from django.dispatch import receiver
 from django.utils.translation import ugettext, ugettext_lazy as _
+from django.contrib.auth.models import User
+from django.db.models.signals import post_save
 
 from mezzanine.conf import settings
 from mezzanine.core.fields import FileField
@@ -18,6 +20,8 @@ from mezzanine.generic.fields import RatingField
 from mezzanine.pages.models import Page
 from mezzanine.utils.models import AdminThumbMixin, upload_to
 from mezzanine.utils.timezone import now
+
+
 
 from cartridge.shop import fields, managers
 
@@ -843,3 +847,86 @@ class DiscountCode(Discount):
     class Meta:
         verbose_name = _("Discount code")
         verbose_name_plural = _("Discount codes")
+
+class UserProfile(models.Model):
+    #This field links users and their profiles
+    user = models.ForeignKey(User, unique=True)
+
+    #Necessary field to distinguish between customers and consultants
+    is_consultant = models.BooleanField()
+    date_joined = models.DateField(auto_now_add=True)
+
+    #Once a consultant - these need to be filled
+
+    ##################################
+    #Constants for the different ranks
+    QUALIFIED_CONSULTANT = 'QC'
+    TEAM_LEADER = 'TL'
+    TEAM_MANAGER = 'TM'
+    EXECUTIVE_MANAGER = 'EM'
+    EXECUTIVE_DIRECTOR = 'ED'
+    RANK_CHOICES = (
+    (QUALIFIED_CONSULTANT, 'Qualified Consultant'),
+    (TEAM_LEADER, 'Team Leader'),
+    (TEAM_MANAGER, 'Team Manager'),
+    (EXECUTIVE_MANAGER, 'Executive Manager'),
+    (EXECUTIVE_DIRECTOR, 'Executive Director'),
+    )
+    ###################################
+
+    #Actual field for the different ranks
+    rank = models.CharField(max_length=2, choices=RANK_CHOICES, blank=True)
+
+    #For all users
+    first_name = models.CharField(_("First name"), max_length=100)
+    last_name = models.CharField(_("Last name"), max_length=100)
+    billing_detail_street = models.CharField(_("Street"), max_length=100)
+    billing_detail_city = models.CharField(_("City"), max_length=100)
+    billing_detail_state = models.CharField(_("Province/State"), max_length=100)
+    billing_detail_postcode = models.CharField(_("Postcode/Zip"), max_length=10)
+    billing_detail_country = models.CharField(_("Country"), max_length=100, default='Canada')
+    billing_detail_phone = models.CharField(_("Phone"), max_length=20)
+    billing_detail_email = models.EmailField(_("Email"))
+
+    #Gender Constants
+    MALE = 'M'
+    FEMALE = 'F'
+    GENDER_CHOICES = (
+        (MALE, 'Male'),
+        (FEMALE, 'Female'),
+    )
+    #Gender field
+    gender = models.CharField(max_length=2, choices=GENDER_CHOICES, blank=False)
+
+    def name(self):
+        return self.first_name + " " + last_name
+
+    class Meta:
+        verbose_name = _("Associate")
+        verbose_name_plural = _("Associates")
+
+        def __str__(self):
+            return "%s's profile" % self.user
+
+#The following puts a signalling link between UserProfiles and Users
+def create_user_profile(sender, instance, created, **kwargs):
+    if created:
+        profile, created = UserProfile.objects.get_or_create(user=instance)
+
+post_save.connect(create_user_profile, sender=User)
+
+class ConsultantOrder(models.model):
+    """
+    This model links a consultant to several orders done in one mass bunch - likely for a party
+    order. Holds information on the party, the host and consultant so that commissions can be tabulated
+
+    Has 1 consultant
+    Has 1 host
+    Has many orders
+    """
+    consultant = models.ForeignKey(User, unique=False)
+    host = models.ForeignKey(User, unique=False)
+
+    #Dates
+    date_opened = models.DateField(auto_now_add=True)
+    date_closed = models.DateField()
