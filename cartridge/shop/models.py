@@ -217,7 +217,7 @@ class ProductVariation(Priced):
     default = models.BooleanField(_("Default"))
     image = models.ForeignKey("ProductImage", verbose_name=_("Image"),
                               null=True, blank=True)
-
+    supplier = models.ForeignKey("Supplier")
     objects = managers.ProductVariationManager()
 
     __metaclass__ = ProductVariationMetaclass
@@ -425,6 +425,9 @@ class Order(models.Model):
                             default=settings.SHOP_ORDER_STATUS_CHOICES[0][0])
 
     objects = managers.OrderManager()
+
+    #Foreign key for the consultant order it belongs to if true
+    consultant_order = models.ForeignKey("ConsultantOrder", blank=True, null=True)
 
     # These are fields that are stored in the session. They're copied to
     # the order in setup() and removed from the session in complete().
@@ -930,3 +933,19 @@ class ConsultantOrder(models.model):
     #Dates
     date_opened = models.DateField(auto_now_add=True)
     date_closed = models.DateField()
+
+    class Meta:
+        verbose_name = _("Consultant Order")
+        verbose_name_plural = _("Consultant Orders")
+
+class Supplier(models.model):
+    """
+    This model holds simple information about the supplier that can be regurgitated on the admin side
+    for inventory reasons.
+
+    Is linked to by ProductVariations
+    """
+
+    name = CharField(_("Name"), max_length=100)
+    code = CharField(_("Supplier Code"), max_length=3)
+    country = CharField(_("Country"), max_length=100)
